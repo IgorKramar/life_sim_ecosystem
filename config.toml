@@ -1,0 +1,51 @@
+[world]
+width = 110
+height = 110
+
+[population]
+init_population = 200
+herbivore_spawn_ratio = 0.3
+max_density_per_type = 3
+
+[plants]
+growth_attempts = 50
+growth_min = 20
+growth_max = 40
+max_energy = 100
+
+[herbivore]
+initial_energy = 120
+birth_energy = 100
+reproduce_min_energy = 70
+max_age = 200
+move_cost = 1
+
+[predator]
+initial_energy = 150
+birth_energy = 120
+reproduce_min_energy = 120
+max_age = 250
+move_cost = 1
+kill_reward = 250
+hunt_fail_penalty = 2
+
+[common]
+migration_cost = 1
+migration_range = 2
+mate_search_radius = 6
+min_energy_after_reproduce = 40
+reproduction_cost = 40
+
+[timing]
+default_tick_interval = 0.05000000074505806
+min_tick_interval = 0.009999999776482582
+max_tick_interval = 0.5
+speed_up_factor = 0.75
+slow_down_factor = 1.350000023841858
+
+[render]
+cell_size = 10.0
+agent_size_min = 0.30000001192092896
+agent_size_max = 1.0
+agent_size_divisor = 100.0
+plant_alpha_divisor = 50.0

@@ -1,25 +1,27 @@
 mod agent;
+mod config;
 mod render;
 mod world;
 
+use config::Config;
 use macroquad::prelude::*;
 use world::World;
 
-const INIT_POPULATION: usize = 100;
-
 #[macroquad::main("Life Sim: Ecosystem")]
 async fn main() {
-    let mut world = World::new(110, 70);
-    world.spawn_initial_agents(INIT_POPULATION);
+    // ✅ Загрузка конфига
+    let config = Config::load();
+
+    let mut world = World::new(&config);
+    world.spawn_initial_agents();
 
     let mut paused = false;
-    let mut tick_interval = 0.05f32;
+    let mut tick_interval = config.timing.default_tick_interval;
     let mut accumulator = 0.0f32;
 
     loop {
         accumulator += get_frame_time();
 
-        // Управление
         if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
             break;
         }
@@ -27,26 +29,25 @@ async fn main() {
             paused = !paused;
         }
         if is_key_pressed(KeyCode::R) {
-            world = World::new(110, 70);
-            world.spawn_initial_agents(INIT_POPULATION);
+            world = World::new(&config);
+            world.spawn_initial_agents();
         }
         if is_key_pressed(KeyCode::Equal) {
-            tick_interval = (tick_interval * 0.75).max(0.01f32);
+            tick_interval = (tick_interval * config.timing.speed_up_factor)
+                .max(config.timing.min_tick_interval);
         }
         if is_key_pressed(KeyCode::Minus) {
-            tick_interval = (tick_interval * 1.35).min(0.5f32);
+            tick_interval = (tick_interval * config.timing.slow_down_factor)
+                .max(config.timing.max_tick_interval);
         }
 
-        // Логика
         if !paused && accumulator >= tick_interval {
             world.tick();
             accumulator -= tick_interval;
         }
 
-        // Рендер
-        render::render_world(&world);
+        render::render_world(&world, &config);
 
-        // Статистика
         let stats = format!(
             "Tick: {:4} | Agents: {:4} | Plants: {:4} | Avg Energy: {:.1} | Speed: {:.0}ms",
             world.tick_count,
@@ -55,7 +56,7 @@ async fn main() {
             world.avg_energy(),
             tick_interval * 1000.0
         );
-        draw_text(&stats, 20.0, 35.0, 20.0, WHITE);
+        draw_text(&stats, 20.0, 35.0, 20.0, config::COLOR_TEXT);
 
         if paused {
             draw_text(
@@ -63,7 +64,7 @@ async fn main() {
                 screen_width() / 2.0 - 150.0,
                 screen_height() / 2.0,
                 30.0,
-                YELLOW,
+                config::COLOR_PAUSED,
             );
         }
 
