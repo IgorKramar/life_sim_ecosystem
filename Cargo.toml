@@ -1,6 +1,6 @@
 [package]
 name = "life_sim_ecosystem"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 authors = ["Igor Kramar"]
 description = "Ecosystem simulation with herbivores and predators"

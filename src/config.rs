@@ -20,6 +20,7 @@ pub struct Config {
     pub herbivore: HerbivoreConfig,
     pub predator: PredatorConfig,
     pub common: CommonConfig,
+    pub genetics: GeneticsConfig, // ✅ Новое!
     pub timing: TimingConfig,
     pub render: RenderConfig,
 }
@@ -74,6 +75,21 @@ pub struct CommonConfig {
     pub reproduction_cost: i32,
 }
 
+// ✅ НОВАЯ СЕКЦИЯ: Генетика
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeneticsConfig {
+    /// Включить запрет на инбридинг
+    pub enable_inbreeding_prevention: bool,
+    /// Запретить размножение с детьми (1 поколение)
+    pub prevent_parent_child: bool,
+    /// Запретить размножение с внуками (2 поколения)
+    pub prevent_grandparent: bool,
+    /// Запретить размножение с братьями/сёстрами
+    pub prevent_siblings: bool,
+    /// Максимальная глубина проверки родословной
+    pub max_genealogy_depth: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimingConfig {
     pub default_tick_interval: f32,
@@ -99,7 +115,6 @@ pub struct RenderConfig {
 const CONFIG_PATH: &str = "config.toml";
 
 impl Config {
-    /// Загружает конфиг из файла или создаёт дефолтный
     pub fn load() -> Self {
         if Path::new(CONFIG_PATH).exists() {
             match fs::read_to_string(CONFIG_PATH) {
@@ -128,7 +143,6 @@ impl Config {
         }
     }
 
-    /// Сохраняет конфиг в файл
     pub fn save(&self) {
         match toml::to_string_pretty(self) {
             Ok(content) => {
@@ -142,17 +156,16 @@ impl Config {
         }
     }
 
-    /// Возвращает дефолтный конфиг
     pub fn default() -> Self {
         Self {
             world: WorldConfig {
                 width: 110,
-                height: 110,
+                height: 70,
             },
             population: PopulationConfig {
-                init_population: 200,
-                herbivore_spawn_ratio: 0.5,
-                max_density_per_type: 3,
+                init_population: 100,
+                herbivore_spawn_ratio: 0.95,
+                max_density_per_type: 8,
             },
             plants: PlantsConfig {
                 growth_attempts: 50,
@@ -173,7 +186,7 @@ impl Config {
                 reproduce_min_energy: 120,
                 max_age: 250,
                 move_cost: 1,
-                kill_reward: 250,
+                kill_reward: 150,
                 hunt_fail_penalty: 2,
             },
             common: CommonConfig {
@@ -182,6 +195,13 @@ impl Config {
                 mate_search_radius: 6,
                 min_energy_after_reproduce: 40,
                 reproduction_cost: 40,
+            },
+            genetics: GeneticsConfig {
+                enable_inbreeding_prevention: true,
+                prevent_parent_child: true,
+                prevent_grandparent: true,
+                prevent_siblings: true,
+                max_genealogy_depth: 3,
             },
             timing: TimingConfig {
                 default_tick_interval: 0.05,
@@ -202,7 +222,7 @@ impl Config {
 }
 
 // ============================================================================
-// 🎨 ЦВЕТА (остались константами, т.к. toml не поддерживает Color)
+// 🎨 ЦВЕТА
 // ============================================================================
 
 pub const COLOR_HERBIVORE_MALE: Color = Color::new(0.0, 0.0, 1.0, 1.0);

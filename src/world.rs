@@ -15,7 +15,7 @@ pub struct World {
     pub agents: Vec<Agent>,
     pub tick_count: u64,
     last_id: u64,
-    config: Config, // ✅ Добавили конфиг
+    config: Config,
 }
 
 impl World {
@@ -52,6 +52,10 @@ impl World {
             };
             let mut agent = Agent::new(self.last_id + 1 + i as u64, pos, sex, a_type, &self.config);
 
+            // ✅ Начальная популяция: поколение 0, уникальный family_root = id
+            agent.genealogy.generation = 0;
+            agent.genealogy.family_root = agent.id;
+
             let max_age = match agent.agent_type {
                 AgentType::Herbivore => self.config.herbivore.max_age,
                 AgentType::Predator => self.config.predator.max_age,
@@ -85,7 +89,7 @@ impl World {
             }
         }
 
-        // 3. Питание — ДВУХФАЗНЫЙ ПОДХОД
+        // 3. Питание
         let mut agents_by_pos: AgentsByPos = HashMap::new();
         for (idx, agent) in self.agents.iter().enumerate() {
             if !agent.is_dead(&self.config) {
@@ -98,7 +102,7 @@ impl World {
             }
         }
 
-        // Фаза 3.2: Растения
+        // Растения
         let mut eaten_plants = Vec::new();
         for (pos, agents) in &agents_by_pos {
             if let Some(&plant_energy) = self.plants.get(pos) {
@@ -120,7 +124,7 @@ impl World {
             self.plants.remove(&pos);
         }
 
-        // Фаза 3.3: Охота хищников
+        // Охота
         for agents in agents_by_pos.values() {
             let predator_indices: Vec<usize> = agents
                 .iter()
@@ -151,7 +155,7 @@ impl World {
             }
         }
 
-        // 4. Миграция
+        // Миграция
         for agents in agents_by_pos.values() {
             for agent_type in [AgentType::Herbivore, AgentType::Predator] {
                 let type_indices: Vec<usize> = agents
@@ -185,7 +189,7 @@ impl World {
             }
         }
 
-        // 5. Размножение
+        // 5. Размножение — С ПРОВЕРКОЙ ИНБРИДИНГА
         let mut reproduction_plan = Vec::new();
         let mut used_partners: HashSet<usize> = HashSet::new();
 
@@ -197,6 +201,7 @@ impl World {
                 continue;
             }
 
+            // Поиск на той же клетке
             let partner = (i + 1..self.agents.len()).find(|&j| {
                 !used_partners.contains(&j)
                     && !self.agents[j].is_dead(&self.config)
@@ -204,8 +209,11 @@ impl World {
                     && self.agents[i].sex != self.agents[j].sex
                     && self.agents[i].agent_type == self.agents[j].agent_type
                     && self.agents[j].can_reproduce(&self.config)
+                    && !self.agents[i].is_close_relative(&self.agents[j], &self.config)
+                // ✅ Проверка инбридинга
             });
 
+            // Поиск в радиусе
             let partner = partner.or_else(|| {
                 self.find_partner_in_radius(
                     i,
@@ -222,6 +230,7 @@ impl World {
             }
         }
 
+        // Применяем размножение
         let mut new_agents = Vec::new();
         for (i, j) in reproduction_plan {
             if self.agents[i].is_dead(&self.config)
@@ -241,16 +250,17 @@ impl World {
             } else {
                 Sex::Female
             };
-            let child_type = self.agents[i].agent_type;
-            let child_energy = match child_type {
-                AgentType::Herbivore => self.config.herbivore.birth_energy,
-                AgentType::Predator => self.config.predator.birth_energy,
-            };
+            // ✅ Удалено: child_type теперь определяется внутри create_offspring
 
             self.last_id += 1;
-            let mut child =
-                Agent::new(self.last_id, child_pos, child_sex, child_type, &self.config);
-            child.energy = child_energy;
+            // ✅ Создаём потомка с правильной генеалогией
+            let child = self.agents[i].create_offspring(
+                &self.agents[j],
+                self.last_id,
+                child_pos,
+                child_sex,
+                &self.config,
+            );
             new_agents.push(child);
         }
 
@@ -277,6 +287,8 @@ impl World {
                 || agent.sex == other.sex
                 || agent.agent_type != other.agent_type
                 || !other.can_reproduce(config)
+                || agent.is_close_relative(other, config)
+            // ✅ Проверка инбридинга
             {
                 continue;
             }
@@ -305,5 +317,14 @@ impl World {
         } else {
             self.agents.iter().map(|a| a.energy as f64).sum::<f64>() / self.agents.len() as f64
         }
+    }
+
+    /// Статистика по поколениям
+    pub fn generation_stats(&self) -> HashMap<u32, usize> {
+        let mut stats = HashMap::new();
+        for agent in &self.agents {
+            *stats.entry(agent.genealogy.generation).or_insert(0) += 1;
+        }
+        stats
     }
 }

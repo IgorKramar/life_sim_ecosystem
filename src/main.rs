@@ -7,9 +7,8 @@ use config::Config;
 use macroquad::prelude::*;
 use world::World;
 
-#[macroquad::main("Life Sim: Ecosystem")]
+#[macroquad::main("Life Sim: Ecosystem v0.0.3")]
 async fn main() {
-    // ✅ Загрузка конфига
     let config = Config::load();
 
     let mut world = World::new(&config);
@@ -18,6 +17,7 @@ async fn main() {
     let mut paused = false;
     let mut tick_interval = config.timing.default_tick_interval;
     let mut accumulator = 0.0f32;
+    let mut show_genealogy = false;
 
     loop {
         accumulator += get_frame_time();
@@ -32,13 +32,16 @@ async fn main() {
             world = World::new(&config);
             world.spawn_initial_agents();
         }
+        if is_key_pressed(KeyCode::G) {
+            show_genealogy = !show_genealogy;
+        }
         if is_key_pressed(KeyCode::Equal) {
             tick_interval = (tick_interval * config.timing.speed_up_factor)
                 .max(config.timing.min_tick_interval);
         }
         if is_key_pressed(KeyCode::Minus) {
             tick_interval = (tick_interval * config.timing.slow_down_factor)
-                .max(config.timing.max_tick_interval);
+                .min(config.timing.max_tick_interval);
         }
 
         if !paused && accumulator >= tick_interval {
@@ -48,15 +51,31 @@ async fn main() {
 
         render::render_world(&world, &config);
 
+        // Статистика
+        let gen_stats = world.generation_stats();
+        let max_gen = gen_stats.keys().max().unwrap_or(&0);
+
         let stats = format!(
-            "Tick: {:4} | Agents: {:4} | Plants: {:4} | Avg Energy: {:.1} | Speed: {:.0}ms",
+            "Tick: {:4} | Agents: {:4} | Plants: {:4} | Avg Energy: {:.1} | Gen: {}",
             world.tick_count,
             world.agents.len(),
             world.plants.len(),
             world.avg_energy(),
-            tick_interval * 1000.0
+            max_gen,
         );
         draw_text(&stats, 20.0, 35.0, 20.0, config::COLOR_TEXT);
+
+        // Статистика по поколениям
+        if show_genealogy {
+            let mut y = 60.0;
+            draw_text("Generations:", 20.0, y, 16.0, config::COLOR_TEXT);
+            y += 20.0;
+            for (gen, count) in gen_stats.iter() {
+                let line = format!("  Gen {}: {}", gen, count);
+                draw_text(&line, 20.0, y, 14.0, config::COLOR_TEXT);
+                y += 18.0;
+            }
+        }
 
         if paused {
             draw_text(
@@ -67,6 +86,15 @@ async fn main() {
                 config::COLOR_PAUSED,
             );
         }
+
+        // Подсказка по управлению
+        draw_text(
+            "G: Toggle genealogy stats",
+            20.0,
+            screen_height() - 30.0,
+            14.0,
+            WHITE,
+        );
 
         next_frame().await;
     }
