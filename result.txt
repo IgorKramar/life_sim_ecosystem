@@ -1,0 +1,618 @@
+├── .cargo
+│   └── config.toml
+├── .git
+│   ├── FETCH_HEAD
+│   ├── HEAD
+│   ├── config
+│   ├── description
+│   ├── gk
+│   │   └── config
+│   ├── hooks
+│   │   ├── applypatch-msg.sample
+│   │   ├── commit-msg.sample
+│   │   ├── fsmonitor-watchman.sample
+│   │   ├── post-update.sample
+│   │   ├── pre-applypatch.sample
+│   │   ├── pre-commit.sample
+│   │   ├── pre-merge-commit.sample
+│   │   ├── pre-push.sample
+│   │   ├── pre-rebase.sample
+│   │   ├── pre-receive.sample
+│   │   ├── prepare-commit-msg.sample
+│   │   ├── push-to-checkout.sample
+│   │   ├── sendemail-validate.sample
+│   │   └── update.sample
+│   ├── info
+│   │   └── exclude
+│   ├── objects
+│   │   ├── info
+│   │   └── pack
+│   └── refs
+│       ├── heads
+│       └── tags
+├── .gitignore
+├── Cargo.lock
+├── Cargo.toml
+├── result.txt
+└── src
+    ├── agent.rs
+    ├── main.rs
+    ├── render.rs
+    └── world.rs
+
+// ./src/agent.rs
+use rand::Rng;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AgentType {
+    Herbivore,
+    Predator,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Sex {
+    Male,
+    Female,
+}
+
+pub type Position = (i32, i32);
+
+#[derive(Clone, Debug)]
+pub struct Agent {
+    pub id: u64,
+    pub pos: Position,
+    pub energy: i32,
+    pub sex: Sex,
+    pub age: u32,
+    pub agent_type: AgentType,
+    pub is_eaten: bool, // Флаг для легкого удаления
+}
+
+impl Agent {
+    pub fn new(id: u64, pos: Position, sex: Sex, agent_type: AgentType) -> Self {
+        // Начальная энергия теперь зависит от типа
+        let initial_energy = if agent_type == AgentType::Herbivore {
+            120
+        } else {
+            150
+        };
+        Self {
+            id,
+            pos,
+            energy: initial_energy,
+            sex,
+            age: 0,
+            agent_type,
+            is_eaten: false,
+        }
+    }
+
+    pub fn move_randomly(&mut self, bounds: (i32, i32)) {
+        let mut rng = rand::thread_rng();
+        // Теперь движение может быть как по x, так и по y, или вообще не двигаться
+        self.pos.0 = (self.pos.0 + rng.gen_range(-1..=1)).clamp(0, bounds.0 - 1);
+        self.pos.1 = (self.pos.1 + rng.gen_range(-1..=1)).clamp(0, bounds.1 - 1);
+        // Уменьшили расход энергии на движение
+        self.energy -= 1;
+    }
+
+    pub fn is_dead(&self) -> bool {
+        let max_age = if self.agent_type == AgentType::Herbivore {
+            200 // Увеличили максимальный возраст
+        } else {
+            250
+        };
+        self.energy <= 0 || self.age > max_age || self.is_eaten
+    }
+
+    /// Вычисляет манхэттенское расстояние до другой позиции
+    pub fn manhattan_distance(&self, other: Position) -> u32 {
+        ((self.pos.0 - other.0).abs() + (self.pos.1 - other.1).abs()) as u32
+    }
+}
+
+
+// ./src/world.rs
+use crate::agent::{Agent, AgentType, Position, Sex};
+use rand::prelude::*;
+use std::collections::HashMap;
+
+pub struct World {
+    pub width: i32,
+    pub height: i32,
+    pub plants: HashMap<Position, u32>, // Максимальное количество энергии растения на клетке
+    pub agents: Vec<Agent>,
+    pub tick_count: u64,
+    last_id: u64, // Для уникальных ID потомства
+}
+
+impl World {
+    pub fn new(width: i32, height: i32) -> Self {
+        Self {
+            width,
+            height,
+            plants: HashMap::new(),
+            agents: Vec::new(),
+            tick_count: 0,
+            last_id: 999, // Предположим, что стартовые ID были от 0 до 999
+        }
+    }
+
+    pub fn spawn_initial_agents(&mut self, count: usize) {
+        let mut rng = thread_rng();
+        for i in 0..count {
+            let pos = (rng.gen_range(0..self.width), rng.gen_range(0..self.height));
+            let sex = if rng.gen_bool(0.5) {
+                Sex::Male
+            } else {
+                Sex::Female
+            };
+            // --- Решение 1: 95% травоядные, 5% хищники ---
+            let a_type = if rng.gen_bool(0.75) {
+                AgentType::Herbivore
+            } else {
+                AgentType::Predator
+            };
+            // -------------------------
+            let agent = Agent::new(self.last_id + 1 + i as u64, pos, sex, a_type);
+            // --- Новое: Случайный возраст ---
+            let max_age_for_type = if agent.agent_type == AgentType::Herbivore {
+                200
+            } else {
+                250
+            };
+            let random_age = rng.gen_range(0..=(max_age_for_type / 4)); // От 0 до четверти max_age
+            let mut agent_with_age = agent;
+            agent_with_age.age = random_age;
+            // -------------------------------
+            self.agents.push(agent_with_age);
+        }
+        self.last_id += count as u64;
+    }
+
+    pub fn tick(&mut self) {
+        self.tick_count += 1;
+        let mut rng = thread_rng();
+
+        // 1. Рост растений (Решение 1: больше и плотнее)
+        for _ in 0..50 {
+            // Было 30 50
+            let pos = (rng.gen_range(0..self.width), rng.gen_range(0..self.height));
+            *self.plants.entry(pos).or_insert(0) =
+                (*self.plants.get(&pos).unwrap_or(&0) + rng.gen_range(20..40)).min(100); // Было 60, стало 100
+        }
+
+        // 2. Движение и старение
+        for agent in &mut self.agents {
+            agent.age += 1;
+            agent.move_randomly((self.width, self.height));
+        }
+
+        // 3. Питание
+        // Сгруппируем агентов по позициям, чтобы эффективно находить тех, кто на одной клетке
+        let mut agents_by_pos: HashMap<Position, Vec<usize>> = HashMap::new();
+        for (idx, agent) in self.agents.iter().enumerate() {
+            if !agent.is_dead() {
+                // Не трогаем мертвых
+                agents_by_pos.entry(agent.pos).or_default().push(idx);
+            }
+        }
+
+        for (pos, indices) in agents_by_pos.iter() {
+            // Сначала обрабатываем растения для травоядных
+            if let Some(&plant_energy) = self.plants.get(pos) {
+                if plant_energy > 0 {
+                    // Найдем индекс первого подходящего травоядного на этой позиции
+                    if let Some(first_herb_idx) = indices.iter().copied().find(|&i| {
+                        self.agents[i].agent_type == AgentType::Herbivore
+                            && !self.agents[i].is_dead()
+                    }) {
+                        // Проверим снова, что агент жив перед изменением
+                        if !self.agents[first_herb_idx].is_dead() {
+                            self.agents[first_herb_idx].energy += plant_energy as i32;
+                            self.plants.remove(pos); // Растение съедено
+                        }
+                    }
+                }
+            }
+
+            // Теперь обрабатываем хищников и их охоту на травоядных на этой же позиции
+            let predators_here_indices: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    self.agents[i].agent_type == AgentType::Predator && !self.agents[i].is_dead()
+                })
+                .collect();
+
+            let herbivores_here_indices: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    self.agents[i].agent_type == AgentType::Herbivore
+                        && !self.agents[i].is_dead()
+                        && !self.agents[i].is_eaten
+                })
+                .collect();
+
+            for predator_idx in &predators_here_indices {
+                // --- Решение 2: "Штраф" за неудачную охоту ---
+                if herbivores_here_indices.is_empty() {
+                    self.agents[*predator_idx].energy -= 2; // Теряет энергию, если не нашёл жертву
+                } else {
+                    // Выбираем случайного травоядного для атаки
+                    if let Some(&target_idx) = herbivores_here_indices.choose(&mut rng) {
+                        // Проверим снова, что хищник и жертва живы перед изменением
+                        if !self.agents[*predator_idx].is_dead()
+                            && !self.agents[target_idx].is_dead()
+                            && !self.agents[target_idx].is_eaten
+                        {
+                            self.agents[target_idx].is_eaten = true;
+                            self.agents[*predator_idx].energy += 150; // Энергия от жертвы
+                        }
+                    }
+                }
+                // -------------------------------------------
+            }
+        }
+
+        // 3.5. Миграция (Решение 4)
+        const MAX_DENSITY_PER_TYPE: usize = 8;
+        for (pos, indices) in agents_by_pos.iter() {
+            // Группируем по типу
+            let herbivores_on_pos: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    self.agents[i].agent_type == AgentType::Herbivore && !self.agents[i].is_dead()
+                })
+                .collect();
+            let predators_on_pos: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    self.agents[i].agent_type == AgentType::Predator && !self.agents[i].is_dead()
+                })
+                .collect();
+
+            // Для травоядных
+            if herbivores_on_pos.len() > MAX_DENSITY_PER_TYPE {
+                let excess = herbivores_on_pos.len() - MAX_DENSITY_PER_TYPE;
+                for _ in 0..excess {
+                    if let Some(idx) = herbivores_on_pos.choose(&mut rng).copied() {
+                        self.agents[idx].move_randomly((self.width, self.height));
+                    }
+                }
+            }
+
+            // Для хищников
+            if predators_on_pos.len() > MAX_DENSITY_PER_TYPE {
+                let excess = predators_on_pos.len() - MAX_DENSITY_PER_TYPE;
+                for _ in 0..excess {
+                    if let Some(idx) = predators_on_pos.choose(&mut rng).copied() {
+                        self.agents[idx].move_randomly((self.width, self.height));
+                    }
+                }
+            }
+        }
+
+        // 4. Размножение (с поиском партнера и решением 1)
+        let mut new_agents = Vec::new(); // Временный вектор для потомства
+        // Проходим по всем возможным парам агентов
+        for i in 0..self.agents.len() {
+            // Проверяем, жив ли агент i перед началом внутреннего цикла
+            if self.agents[i].is_dead() {
+                continue;
+            }
+            let agent_i = &self.agents[i];
+
+            // --- Решение 1: Порог энергии зависит от типа ---
+            let min_energy_for_reproduction: i32;
+            if agent_i.agent_type == AgentType::Predator {
+                min_energy_for_reproduction = 120;
+            } else {
+                min_energy_for_reproduction = 70;
+            }
+
+            // Проверяем условия размножения для агента i
+            if agent_i.energy >= min_energy_for_reproduction {
+                // 4a. Проверка на размножение на той же клетке
+                let partner_on_same_cell = (i + 1..self.agents.len()).find(|&j| {
+                    let agent_j = &self.agents[j];
+                    !agent_j.is_dead()
+                        && agent_i.pos == agent_j.pos
+                        && agent_i.sex != agent_j.sex
+                        && agent_i.agent_type == agent_j.agent_type
+                        && agent_j.energy >= min_energy_for_reproduction
+                });
+
+                if let Some(j) = partner_on_same_cell {
+                    // Проверим ещё раз, не умерли ли они во время итерации (хотя маловероятно)
+                    // И убедимся, что они всё ещё удовлетворяют условиям (энергия могла измениться при питании в этом же тике)
+                    if !self.agents[i].is_dead()
+                        && !self.agents[j].is_dead()
+                        && self.agents[i].energy >= 40
+                        && self.agents[j].energy >= 40
+                    {
+                        // Потребляем энергию за размножение
+                        self.agents[i].energy -= 40;
+                        self.agents[j].energy -= 40;
+
+                        // Создаём потомка
+                        let child_pos = self.agents[i].pos;
+                        let child_sex = if rng.gen_bool(0.5) {
+                            Sex::Male
+                        } else {
+                            Sex::Female
+                        };
+                        let child_type = self.agents[i].agent_type;
+                        let child_energy = if child_type == AgentType::Herbivore {
+                            100
+                        } else {
+                            120
+                        };
+                        self.last_id += 1;
+                        let child_agent =
+                            Agent::new(self.last_id, child_pos, child_sex, child_type);
+                        let mut child_agent = child_agent;
+                        child_agent.energy = child_energy;
+
+                        new_agents.push(child_agent);
+                    }
+                    continue; // Переходим к следующему i, если размножились на месте
+                }
+
+                // 4b. Если на клетке нет партнера, ищем в радиусе
+                let search_radius = 6u32;
+                let potential_partner_idx = self.find_partner_in_radius(agent_i, i, search_radius);
+
+                if let Some(j) = potential_partner_idx {
+                    // Проверим ещё раз, не умерли ли они во время итерации
+                    if !self.agents[i].is_dead()
+                        && !self.agents[j].is_dead()
+                        && self.agents[i].energy >= 40
+                        && self.agents[j].energy >= 40
+                    {
+                        // Потребляем энергию за размножение
+                        self.agents[i].energy -= 40;
+                        self.agents[j].energy -= 40;
+
+                        // Создаём потомка
+                        let child_pos = self.agents[i].pos;
+                        let child_sex = if rng.gen_bool(0.5) {
+                            Sex::Male
+                        } else {
+                            Sex::Female
+                        };
+                        let child_type = self.agents[i].agent_type;
+                        let child_energy = if child_type == AgentType::Herbivore {
+                            100
+                        } else {
+                            120
+                        };
+                        self.last_id += 1;
+                        let child_agent =
+                            Agent::new(self.last_id, child_pos, child_sex, child_type);
+                        let mut child_agent = child_agent;
+                        child_agent.energy = child_energy;
+
+                        new_agents.push(child_agent);
+                    }
+                }
+            }
+        }
+
+        // 5. Удаление мёртвых и добавление новорождённых
+        self.agents.retain(|a| !a.is_dead());
+        self.agents.extend(new_agents);
+    }
+
+    /// Ищет подходящего партнёра для агента `agent_i` с индексом `agent_i_idx` в заданном радиусе.
+    /// Возвращает индекс партнёра, если найден.
+    fn find_partner_in_radius(
+        &self,
+        agent_i: &Agent,
+        agent_i_idx: usize,
+        radius: u32,
+    ) -> Option<usize> {
+        for (j, agent_j) in self.agents.iter().enumerate() {
+            // Пропускаем самого себя и мертвых
+            if j == agent_i_idx || agent_j.is_dead() {
+                continue;
+            }
+
+            // Проверяем тип, пол и энергию
+            let min_energy_for_reproduction = if agent_i.agent_type == AgentType::Predator {
+                120
+            } else {
+                70
+            };
+
+            if agent_i.agent_type == agent_j.agent_type
+                && agent_i.sex != agent_j.sex
+                && agent_j.energy >= min_energy_for_reproduction
+            {
+                // Проверяем расстояние
+                if agent_i.manhattan_distance(agent_j.pos) <= radius {
+                    return Some(j); // Найден подходящий партнёр
+                }
+            }
+        }
+        None // Партнёр не найден
+    }
+
+    pub fn get_render_data(
+        &self,
+    ) -> (
+        Vec<(Position, AgentType, Sex, i32)>,
+        &HashMap<Position, u32>,
+    ) {
+        (
+            self.agents
+                .iter()
+                .map(|a| (a.pos, a.agent_type, a.sex, a.energy))
+                .collect(),
+            &self.plants,
+        )
+    }
+
+    pub fn avg_energy(&self) -> f64 {
+        if self.agents.is_empty() {
+            0.0
+        } else {
+            self.agents.iter().map(|a| a.energy as f64).sum::<f64>() / self.agents.len() as f64
+        }
+    }
+}
+
+
+// ./src/main.rs
+mod agent;
+mod render;
+mod world;
+
+use macroquad::prelude::*;
+use world::World;
+
+const INIT_POPULATION: usize = 100; // Немного увеличим для стабильности популяции
+
+#[macroquad::main("Life Sim: Ecosystem")]
+async fn main() {
+    // Инициализируем мир 110x70
+    let mut world = World::new(110, 70);
+    world.spawn_initial_agents(INIT_POPULATION);
+
+    let mut paused = false;
+    let mut tick_interval = 0.05f32; // Чуть быстрее для плавности
+    let mut accumulator = 0.0f32;
+
+    loop {
+        // Управление временем
+        accumulator += get_frame_time();
+
+        // Обработка ввода
+        if is_key_pressed(KeyCode::Q) || is_key_pressed(KeyCode::Escape) {
+            break;
+        }
+        if is_key_pressed(KeyCode::P) || is_key_pressed(KeyCode::Space) {
+            paused = !paused;
+        }
+        if is_key_pressed(KeyCode::R) {
+            world = World::new(110, 70);
+            world.spawn_initial_agents(INIT_POPULATION);
+        }
+        if is_key_pressed(KeyCode::Equal) {
+            tick_interval = (tick_interval * 0.75).max(0.01f32);
+        }
+        if is_key_pressed(KeyCode::Minus) {
+            tick_interval = (tick_interval * 1.35).min(0.5f32);
+        }
+
+        // Обновление логики
+        if !paused && accumulator >= tick_interval {
+            world.tick();
+            accumulator -= tick_interval;
+        }
+
+        // Рендеринг (вызываем функцию из render.rs)
+        render::render_world(&world);
+
+        // Статистика поверх всего
+        let stats = format!(
+            "Tick: {:4} | Agents: {:4} | Plants: {:4} | Avg Energy: {:.1} | Speed: {:.0}ms",
+            world.tick_count,
+            world.agents.len(),
+            world.plants.len(),
+            world.avg_energy(),
+            tick_interval * 1000.0
+        );
+        draw_text(&stats, 20.0, 35.0, 20.0, WHITE);
+
+        if paused {
+            draw_text(
+                "PAUSED — Press Space to resume",
+                screen_width() / 2.0 - 150.0,
+                screen_height() / 2.0,
+                30.0,
+                YELLOW,
+            );
+        }
+
+        next_frame().await;
+    }
+}
+
+
+// ./src/render.rs
+use crate::agent::{AgentType, Sex};
+use crate::world::World;
+use macroquad::prelude::*;
+
+// Настройки масштабирования (размер клетки на экране)
+const CELL_SIZE: f32 = 10.0;
+
+pub fn render_world(world: &World) {
+    clear_background(BLACK);
+
+    // 1. Отрисовка растений
+    for (pos, &amount) in &world.plants {
+        // Прозрачность растения зависит от его "плотности" (количества энергии в кусте)
+        let alpha = (amount as f32 / 50.0).min(1.0);
+        draw_rectangle(
+            pos.0 as f32 * CELL_SIZE,
+            pos.1 as f32 * CELL_SIZE,
+            CELL_SIZE,
+            CELL_SIZE,
+            Color::new(0.0, 0.8, 0.0, alpha),
+        );
+    }
+
+    // 2. Получение данных об агентах
+    let (agents, _) = world.get_render_data();
+
+    // 3. Отрисовка агентов
+    for (pos, a_type, sex, energy) in agents {
+        // Выбираем цвет в зависимости от типа и пола
+        let color = match (a_type, sex) {
+            (AgentType::Predator, Sex::Male) => RED,
+            (AgentType::Predator, Sex::Female) => MAROON, // Темно-красный
+            (AgentType::Herbivore, Sex::Male) => BLUE,
+            (AgentType::Herbivore, Sex::Female) => SKYBLUE,
+        };
+
+        // Размер агента зависит от его энергии (минимум 0.3, максимум 1.0)
+        let radius = (energy as f32 / 100.0).clamp(0.3, 1.0) * (CELL_SIZE / 2.0);
+
+        // Рисуем тело агента
+        draw_circle(
+            pos.0 as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+            pos.1 as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+            radius,
+            color,
+        );
+
+        // Можно добавить обводку для лучшей видимости
+        draw_circle_lines(
+            pos.0 as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+            pos.1 as f32 * CELL_SIZE + CELL_SIZE / 2.0,
+            radius,
+            1.0,
+            WHITE,
+        );
+    }
+
+    // 4. Текстовый интерфейс (Статистика)
+    draw_text(
+        &format!(
+            "Ticks: {} | Agents: {} | Avg Energy: {:.1}",
+            world.tick_count,
+            world.agents.len(),
+            world.avg_energy()
+        ),
+        10.0,
+        20.0,
+        20.0,
+        WHITE,
+    );
+}
+
