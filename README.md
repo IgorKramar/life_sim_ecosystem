@@ -16,6 +16,8 @@ A small visual ecosystem · herbivores and predators · configurable rules
 
 [Run](#run) · [Controls](#controls) · [Configuration](#configuration) · [Genealogy](#genealogy-and-limits) · [Development](#development)
 
+[![MIT](https://img.shields.io/badge/license-MIT-9ece6a?style=flat-square)](LICENSE)
+
 </div>
 
 Watch plants grow, herbivores feed and predators hunt on a grid. Agents spend energy, age, reproduce and die; the on-screen counters show population, plants, average energy and generation. Version **0.0.3** is an experimental simulation, not a scientifically validated ecology model.
@@ -166,6 +168,6 @@ Dependencies in [Cargo.toml](Cargo.toml): Macroquad `0.4.14`, rand `0.10.0`, Ser
 
 ## License
 
-The previous README declared MIT, but this checkout does not yet include the license text. A license file needs to be supplied before presenting a complete licensing statement.
+[MIT](LICENSE) · Copyright © 2026 Igor Kramar. Third-party materials and linked resources retain their respective licenses and rights.
 
 Built with [Rust](https://www.rust-lang.org/) and [Macroquad](https://macroquad.rs/). Thanks to the Rust community for its help and examples.
