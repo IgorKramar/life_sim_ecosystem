@@ -1,156 +1,87 @@
-# 🦀 Life Sim: Ecosystem
+<div align="center">
 
-**Версия:** 0.0.3
-**Язык:** Rust
-**Движок:** Macroquad
-**Лицензия:** MIT
+# Life Sim: Ecosystem
 
----
+**English** · [Русский](README.ru.md)
 
-## 📖 Описание
+### Grow. Hunt. Adapt the balance.
 
-**Life Sim: Ecosystem** — это симулятор экосистемы с травоядными и хищниками, написанный на Rust. Наблюдайте за рождением, жизнью, охотой и смертью агентов в динамически меняющемся мире.
+A small visual ecosystem · herbivores and predators · configurable rules
 
-Каждый агент имеет:
-- 🎂 Возраст и продолжительность жизни
-- ⚡ Энергию (тратится на движение, размножение)
-- 👫 Пол (для размножения)
-- 🧬 Тип (травоядный или хищник)
-- 🌳 **Генеалогическое дерево** (родители, поколение, семейный корень)
+[![Build](https://github.com/IgorKramar/life_sim_ecosystem/actions/workflows/rust.yml/badge.svg)](https://github.com/IgorKramar/life_sim_ecosystem/actions/workflows/rust.yml)
+[![Release](https://img.shields.io/github/v/release/IgorKramar/life_sim_ecosystem?style=flat-square&color=7aa2f7)](https://github.com/IgorKramar/life_sim_ecosystem/releases)
+![Rust](https://img.shields.io/badge/Rust-e0af68?style=flat-square&logo=rust&logoColor=black)
+![Macroquad](https://img.shields.io/badge/graphics-Macroquad-bb9af7?style=flat-square)
+![TOML](https://img.shields.io/badge/config-TOML-9ece6a?style=flat-square)
 
----
+[Run](#run) · [Controls](#controls) · [Configuration](#configuration) · [Genealogy](#genealogy-and-limits) · [Development](#development)
 
-## ✨ Возможности
+</div>
 
-| Фича                       | Описание                                                 |
-| -------------------------- | -------------------------------------------------------- |
-| 🌱 **Растения**             | Растут случайно, дают энергию травоядным                 |
-| 🐇 **Травоядные**           | Едят растения, размножаются, мигрируют при перенаселении |
-| 🐺 **Хищники**              | Охотятся на травоядных, получают энергию за убийство     |
-| 🔍 **Поиск партнёра**       | Агенты ищут партнёров в радиусе 6 клеток                 |
-| 🧬 **Генеалогия**           | Каждое существо хранит историю родителей и поколение     |
-| 🚫 **Запрет инбридинга**    | Нельзя размножаться с детьми, внуками, братьями/сёстрами |
-| 📊 **Статистика поколений** | Отслеживание распределения популяции по поколениям       |
-| 📊 **Статистика**           | Отображение тиков, популяции, средней энергии            |
-| ⚙️ **TOML-конфиг**          | Все параметры балансируются без перекомпиляции           |
-| 🎮 **Управление**           | Пауза, перезапуск, ускорение/замедление времени          |
+Watch plants grow, herbivores feed and predators hunt on a grid. Agents spend energy, age, reproduce and die; the on-screen counters show population, plants, average energy and generation. Version **0.0.3** is an experimental simulation, not a scientifically validated ecology model.
 
----
+## Inside the world
 
-## 🚀 Быстрый старт
+| System | Behavior |
+|:---|:---|
+| Plants | Random growth provides energy for herbivores |
+| Herbivores | Feed, find mates and migrate when crowded |
+| Predators | Hunt herbivores and gain energy from kills |
+| Agents | Track sex, age, energy, parents, generation and family root |
+| Observation | Pause, restart, change speed and inspect generation counts |
+| Balance | Edit world size, population, food, energy and reproduction in TOML |
 
-### Требования
+## Run
 
-- Rust 1.75+ ([установка](https://rustup.rs/))
-- Графический драйвер с поддержкой OpenGL 3.3+
+Use a current stable Rust toolchain and a graphical desktop compatible with Macroquad. A minimum supported Rust version is not pinned in the manifest.
 
-### Сборка и запуск
-
-```bash
-# Клонировать репозиторий
-git clone <your-repo-url>
+```sh
+git clone https://github.com/IgorKramar/life_sim_ecosystem.git
 cd life_sim_ecosystem
-
-# Собрать и запустить
-cargo run --release
+cargo run --release --locked
 ```
 
-При первом запуске автоматически создаётся файл `config.toml` с настройками по умолчанию.
+Run from the repository directory to use its [config.toml](config.toml). Without that file in the working directory, the application attempts to create a default one. A read or parse error falls back to defaults and prints a diagnostic.
 
----
+[Published releases](https://github.com/IgorKramar/life_sim_ecosystem/releases) are available separately; check each release's assets for a suitable build.
 
-## 🎮 Управление
+## Controls
 
-| Клавиша       | Действие                               |
-| ------------- | -------------------------------------- |
-| `P` / `Space` | ⏸️ Пауза / Продолжить                   |
-| `R`           | 🔄 Перезапустить симуляцию              |
-| `G`           | 📊 Показать/скрыть статистику поколений |
-| `+` / `=`     | ⚡ Ускорить время (до 100 тиков/сек)    |
-| `-`           | 🐢 Замедлить время (до 2 тиков/сек)     |
-| `Q` / `Esc`   | 🚪 Выход                                |
+| Key | Action |
+|:---|:---|
+| `P` / `Space` | Pause or resume |
+| `R` | Reset the world using the already loaded configuration |
+| `G` | Show or hide generation counts |
+| `=` / `+` | Speed up; default limit is about 100 ticks/second |
+| `-` | Slow down; default limit is 2 ticks/second |
+| `Q` / `Esc` | Quit |
 
----
+Actual simulation throughput depends on rendering and hardware. The keyboard handler uses the `Equal` key code for acceleration.
 
-## ⚙️ Конфигурация
+## Configuration
 
-Все параметры симуляции находятся в файле `config.toml`. Изменения применяются **без перекомпиляции**!
+Edit [config.toml](config.toml), then **exit and start the program again**. No recompilation is needed. `R` resets agents but does not reread the file; live configuration reload is not implemented.
 
-### Пример конфигурации
+| Section | Parameters |
+|:---|:---|
+| `world` | Grid width and height |
+| `population` | Initial count, herbivore ratio and crowding threshold |
+| `plants` | Growth attempts, growth amounts and energy cap |
+| `herbivore`, `predator` | Initial/birth energy, age, movement and reproduction thresholds; hunting rewards/penalties |
+| `common` | Migration, mate-search radius and reproduction costs |
+| `genetics` | Relatedness-filter switches and genealogy settings |
+| `timing` | Starting tick interval, limits and speed multipliers |
+| `render` | Cell size, agent-size limits and plant transparency |
 
-```toml
-# 🌍 МИР
-[world]
-width = 110
-height = 70
+The committed configuration starts with a herbivore ratio of **0.65**. The fallback in `Config::default()` uses **0.95**; removing the file changes the initial balance.
 
-# 👥 ПОПУЛЯЦИЯ
-[population]
-init_population = 100
-herbivore_spawn_ratio = 0.95
-max_density_per_type = 8
+<details>
+<summary><strong>Three balance experiments</strong></summary>
 
-# 🌱 РАСТЕНИЯ
-[plants]
-growth_attempts = 50
-growth_min = 20
-growth_max = 40
-max_energy = 100
+Apply these values to the matching sections of the existing file; these fragments are not complete configurations.
 
-# 🐇 ТРАВОЯДНЫЕ
-[herbivore]
-initial_energy = 120
-birth_energy = 100
-reproduce_min_energy = 70
-max_age = 200
-move_cost = 1
+**Hardcore — stronger predators**
 
-# 🐺 ХИЩНИКИ
-[predator]
-initial_energy = 150
-birth_energy = 120
-reproduce_min_energy = 120
-max_age = 250
-move_cost = 1
-kill_reward = 150
-hunt_fail_penalty = 2
-
-# 🔄 ОБЩИЕ ПАРАМЕТРЫ
-[common]
-migration_cost = 1
-migration_range = 2
-mate_search_radius = 6
-min_energy_after_reproduce = 40
-reproduction_cost = 40
-
-# 🧬 ГЕНЕТИКА (НОВОЕ!)
-[genetics]
-enable_inbreeding_prevention = true
-prevent_parent_child = true
-prevent_grandparent = true
-prevent_siblings = true
-max_genealogy_depth = 3
-
-# ⏱️ ВРЕМЯ
-[timing]
-default_tick_interval = 0.05
-min_tick_interval = 0.01
-max_tick_interval = 0.5
-speed_up_factor = 0.75
-slow_down_factor = 1.35
-
-# 🎨 РЕНДЕР
-[render]
-cell_size = 10.0
-agent_size_min = 0.3
-agent_size_max = 1.0
-agent_size_divisor = 100.0
-plant_alpha_divisor = 50.0
-```
-
-### 🎚️ Пресеты баланса
-
-#### 🔥 Hardcore (хищники доминируют)
 ```toml
 [predator]
 kill_reward = 200
@@ -160,7 +91,8 @@ hunt_fail_penalty = 1
 reproduce_min_energy = 100
 ```
 
-#### 🌿 Garden (травоядные процветают)
+**Garden — more plants and herbivores**
+
 ```toml
 [plants]
 growth_attempts = 100
@@ -170,7 +102,8 @@ max_energy = 200
 herbivore_spawn_ratio = 0.99
 ```
 
-#### 🗺️ Big World (большой мир)
+**Big World — a larger grid**
+
 ```toml
 [world]
 width = 200
@@ -180,161 +113,59 @@ height = 150
 init_population = 300
 ```
 
----
+</details>
 
-## 📁 Структура проекта
+## Visual key
 
-```
-life_sim_ecosystem/
-├── Cargo.toml          # Зависимости и метаданные
-├── config.toml         # Конфигурация симуляции (создаётся автоматически)
-├── README.md           # Этот файл
-└── src/
-    ├── main.rs         # Точка входа, игровой цикл
-    ├── config.rs       # Загрузка и структура конфига
-    ├── agent.rs        # Логика агентов + генеалогия
-    ├── world.rs        # Логика мира + проверка инбридинга
-    └── render.rs       # Отрисовка через macroquad
-```
+| Entity | Color | Shape |
+|:---|:---|:---|
+| Plant | Green; opacity reflects energy | Square |
+| Male / female herbivore | Blue / light blue | Circle |
+| Male / female predator | Red / dark red | Circle |
 
----
+Agent size reflects energy, within the configured rendering limits.
 
-## 🎨 Визуальные обозначения
+## Genealogy and limits
 
-| Объект           | Цвет                             | Форма   |
-| ---------------- | -------------------------------- | ------- |
-| 🌱 Растение       | Зелёный (прозрачность = энергия) | Квадрат |
-| 🐇 Травоядный (♂) | Синий                            | Круг    |
-| 🐇 Травоядный (♀) | Голубой                          | Круг    |
-| 🐺 Хищник (♂)     | Красный                          | Круг    |
-| 🐺 Хищник (♀)     | Тёмно-красный                    | Круг    |
+Every agent records `parent1_id`, `parent2_id`, `generation` and `family_root`. Initial agents belong to generation zero. Press `G` to display the number of living agents in each generation.
 
-**Размер агента** зависит от его энергии (чем больше энергии — тем крупнее).
+Relatedness filtering is **heuristic**: it first compares family roots, then checks parents and shared parents. The grandparent option blocks agents with the same family root and a generation gap of at least two; it does not traverse a complete ancestry tree. Relationships across different roots can be missed. `max_genealogy_depth` is present in the configuration but is not used by the current check.
 
----
+There is no save/load, CSV export, inherited mutation system or terrain model. These remain ideas, alongside live preset switching, population graphs, video recording and manual sandbox placement.
 
-## 🧬 Система генеалогии
+## Development
 
-### Что отслеживается
-
-Каждый агент хранит:
-- **parent1_id** — ID первого родителя (мать)
-- **parent2_id** — ID второго родителя (отец)
-- **generation** — Номер поколения (0 для начальной популяции)
-- **family_root** — Уникальный идентификатор семейной линии
-
-### Запрет инбридинга
-
-Система автоматически предотвращает размножение между:
-- 👨‍👦 **Родители и дети** (1 поколение)
-- 👴‍👦 **Бабушки/дедушки и внуки** (2 поколения)
-- 👫 **Братья и сёстры** (общие родители)
-
-### Статистика поколений
-
-Нажмите `G` для просмотра распределения популяции по поколениям:
-```
-Generations:
-  Gen 0: 50   # Начальная популяция
-  Gen 1: 120  # Первое поколение потомков
-  Gen 2: 85   # Второе поколение
-  Gen 3: 42   # Третье поколение
+```sh
+cargo check --locked
+cargo clippy --locked -- -D warnings
+cargo test --locked
+cargo run                 # debug build
+cargo run --release       # optimized build
+cargo clean               # remove build artifacts
 ```
 
----
+Before proposing changes, run the checks, exercise the release build and update configuration documentation when adding parameters. The existing workflow runs a build and tests.
 
-## 🧪 Сборка и тестирование
+| File | Responsibility |
+|:---|:---|
+| [src/main.rs](src/main.rs) | Event loop and controls |
+| [src/config.rs](src/config.rs) | Configuration loading and defaults |
+| [src/agent.rs](src/agent.rs) | Agents, reproduction and relatedness |
+| [src/world.rs](src/world.rs) | World updates and population |
+| [src/render.rs](src/render.rs) | Macroquad rendering |
 
-```bash
-# Проверка компиляции
-cargo check
+Dependencies in [Cargo.toml](Cargo.toml): Macroquad `0.4.14`, rand `0.10.0`, Serde `1.0`, TOML `0.8`; exact resolved versions are in `Cargo.lock`.
 
-# Линтинг
-cargo clippy -- -D warnings
+## Version history
 
-# Запуск в режиме отладки
-cargo run
+| Version | Focus |
+|:---|:---|
+| 0.0.3 | Genealogy fields, relatedness filtering and generation counters |
+| 0.0.2 | TOML configuration, radius-based mate search and modular layout |
+| 0.0.1 | Plants, herbivores, predators and time controls |
 
-# Запуск в режиме релиза (оптимизировано)
-cargo run --release
+## License
 
-# Очистка кэша
-cargo clean
-```
+The previous README declared MIT, but this checkout does not yet include the license text. A license file needs to be supplied before presenting a complete licensing statement.
 
----
-
-## 🛠️ Зависимости
-
-| Крат        | Версия | Назначение                  |
-| ----------- | ------ | --------------------------- |
-| `macroquad` | 0.4.14 | Графический движок          |
-| `rand`      | 0.10.0 | Генерация случайных чисел   |
-| `serde`     | 1.0    | Сериализация/десериализация |
-| `toml`      | 0.8    | Парсинг TOML-конфига        |
-
----
-
-## 📈 История версий
-
-### v0.0.3 (текущая)
-- ✨ **Генеалогическое дерево** для каждого агента
-- 🚫 **Запрет инбридинга** (дети, внуки, siblings)
-- 📊 **Статистика поколений** (клавиша G)
-- ⚙️ **Настройка генетики** в config.toml
-- 🐛 Исправлены все предупреждения clippy
-
-### v0.0.2
-- ⚙️ **TOML-конфигурация** (все параметры в одном файле)
-- 💑 **Поиск партнёра в радиусе** (6 клеток)
-- 🏗️ **Модульная архитектура**
-- 📚 Подробная документация
-
-### v0.0.1
-- 🌱 Базовая симуляция
-- 🐇 Травоядные и 🐺 Хищники
-- 🎮 Управление временем
-
----
-
-## 📈 Планы на будущее (v0.0.4)
-
-- [ ] 📊 Экспорт статистики в CSV для анализа
-- [ ] 🎚️ Горячие клавиши для смены пресетов на лету
-- [ ] 🧬 Наследуемые признаки (мутации, эволюция)
-- [ ] 🗺️ Разные типы ландшафта (вода, горы, леса)
-- [ ] 💾 Сохранение/загрузка состояния мира
-- [ ] 📈 Графики популяции в реальном времени
-- [ ] 🎥 Запись видео симуляции
-- [ ] 🧪 Режим "песочницы" с ручным размещением
-
----
-
-## 🤝 Вклад в проект
-
-Pull Request'ы приветствуются! Перед отправкой:
-
-1. Убедитесь, что `cargo clippy -- -D warnings` проходит без ошибок
-2. Протестируйте изменения в режиме релиза
-3. Обновите `config.toml`, если добавили новые параметры
-4. Добавьте описание изменений в README.md
-
----
-
-## 📄 Лицензия
-
-MIT License — см. файл [LICENSE](LICENSE) для деталей.
-
----
-
-## 🙏 Благодарности
-
-- [Macroquad](https://macroquad.rs/) — простой и быстрый игровой движок
-- [Rust](https://www.rust-lang.org/) — язык, который делает невозможное возможным
-- Сообщество [users.rust-lang.org](https://users.rust-lang.org/) за помощь с `rand 0.10`
-
----
-
-**Создано с ❤️ на Rust**
-
-*«В природе нет ничего лишнего» — даже в симуляции.* 🦀🌿
+Built with [Rust](https://www.rust-lang.org/) and [Macroquad](https://macroquad.rs/). Thanks to the Rust community for its help and examples.
